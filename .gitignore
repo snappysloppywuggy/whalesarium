@@ -1,0 +1,12 @@
+# runtime artifacts
+*.log
+host-boot.log
+
+# dependencies
+node_modules/
+
+# editors and OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
