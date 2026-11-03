@@ -3617,7 +3617,15 @@ nav.SNx2jG_frame {
       if (sort === 'name') list.sort((a, b) => a.term.localeCompare(b.term))
       const rows = list.slice(0, 120).map((record) => {
         const entry = ENTRY_BY_ID.get(record.id)
-        const gloss = entry ? pick(entry.short, lang) : t.unknown
+        // A word saved from a selection has no glossary gloss, so reuse the
+        // definition already paid for instead of repeating "not in dictionary"
+        // under a chip that says exactly that.
+        const stored = !entry && record.ai ? record.ai[lang] || record.ai.en || null : null
+        const gloss = entry
+          ? pick(entry.short, lang)
+          : stored && typeof stored.definition === 'string' && stored.definition
+            ? stored.definition
+            : '—'
         const kindLabel = entry ? (entry.kind === 'product' ? t.product : t.term) : t.unknown
         // The bank is one vocabulary; only the gloss has a language, and it is
         // English whenever the active language has no translation to offer.

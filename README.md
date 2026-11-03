@@ -24,6 +24,25 @@ hundred years.
 - **Smart switching**: highlighting an English term opens the English pane, Indonesian prose opens
   the Indonesian one.
 
+## A look at it
+
+Clicking a highlighted word opens the pane. One word keeps a definition **per language**, so
+switching between the two languages in the switch is instant once each has been fetched:
+
+| English | Indonesian |
+| --- | --- |
+| <img src="docs/definition-en.png" width="320" alt="Definition pane for the word commit, in English"> | <img src="docs/definition-id.png" width="320" alt="Definition pane for the word commit, in Indonesian"> |
+
+The word bank keeps every word you opened — usage and open counts, per-session history, its own
+filter and sort, a language badge on each card, and an A–Z index down the right edge that jumps to
+the letter you click:
+
+<p><img src="docs/word-bank.png" width="430" alt="Word bank filled with saved words"></p>
+
+And the dock before you pick a word, with the settings gear and the bank shortcut:
+
+<p><img src="docs/welcome.png" width="430" alt="Whalesarium welcome screen"></p>
+
 ## Where definitions come from
 
 The matching Wiktionary edition is asked first — free, fast, and credited in the pane (CC BY-SA
