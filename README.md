@@ -11,14 +11,15 @@ hundred years.
 
 ## What it does
 
-- **Highlights** 33 technical terms and 11 product names (112 surface forms) inline in chat prose,
-  without destroying the surrounding Markdown.
+- **Highlights** the shipped glossary — 44 entries (33 technical terms and 11 product names, 112
+  surface forms once aliases are counted) — inline in chat prose, leaving the surrounding Markdown
+  untouched.
 - **Hover** a highlighted word for a short card, **click** it for the full definition in the
   sidebar pane: senses, an example, where you met it, and related terms.
-- **Right-click any selection** → `What dis?` explains words that are not in the glossary.
-- **Word bank** of everything you opened: use and open counts, per-session history, search,
-  filter (terms, products, undefined, opened, unopened), sort (name, date), and an A–Z index
-  whose letters jump to the matching word.
+- **Right-click any selection** → `What dis?` explains a word that is not in the glossary.
+- **Word bank** of every word you open, glossary entry or not: use and open counts, per-session
+  history, search, filter (terms, products, undefined, opened, unopened), sort (name, date), and an
+  A–Z index whose letters jump to the matching word.
 - **Two-language switch**: pick any two of twenty languages in Settings. The definition is fetched
   per language, so one word can hold an English and an Indonesian explanation at once.
 - **Smart switching**: highlighting an English term opens the English pane, Indonesian prose opens
