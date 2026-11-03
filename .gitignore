@@ -2,6 +2,10 @@
 *.log
 host-boot.log
 
+# the word bank the Host persists for you — never committed
+bank.json
+bank.json.tmp
+
 # dependencies
 node_modules/
 

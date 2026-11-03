@@ -1156,6 +1156,72 @@ window.__ModuleLoader__.load({
       }
     }
 
+    /* The Host keeps the bank so it survives a restart. The GUI port changes on
+     * every start, and localStorage is keyed by origin, so the browser copy
+     * alone would hand the reader an empty bank each time. */
+
+    const BANK_ENDPOINT = '/complex-words/bank'
+
+    function bankStamp(record) {
+      return Math.max(record.lastOpenAt || 0, record.lastUseAt || 0, record.firstSeenAt || 0)
+    }
+
+    function mergeWords(local, remote) {
+      const merged = {}
+      for (const [id, record] of Object.entries(remote || {})) merged[id] = record
+      const weight = (item) => (item.useCount || 0) + (item.openCount || 0)
+      for (const [id, record] of Object.entries(local || {})) {
+        const other = merged[id]
+        if (!other) {
+          merged[id] = record
+          continue
+        }
+        const mine = bankStamp(record)
+        const theirs = bankStamp(other)
+        if (mine > theirs || (mine === theirs && weight(record) > weight(other))) merged[id] = record
+      }
+      return merged
+    }
+
+    function pushBank() {
+      try {
+        const body = JSON.stringify(bank.data)
+        if (body.length > 4 * 1024 * 1024) return
+        fetch(BANK_ENDPOINT, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body,
+          keepalive: true,
+        }).catch(() => {})
+      } catch (error) {
+        /* the browser copy still works when the Host route is absent */
+      }
+    }
+
+    async function hydrateBank() {
+      try {
+        const response = await fetch(BANK_ENDPOINT, { headers: { accept: 'application/json' } })
+        if (!response.ok) return
+        const remote = await response.json()
+        if (!remote || !remote.words || typeof remote.words !== 'object') return
+        const local = bank.data.words || {}
+        const merged = mergeWords(local, remote.words)
+        const mergedCount = Object.keys(merged).length
+        const remoteCount = Object.keys(remote.words).length
+        const changed = JSON.stringify(Object.keys(merged).sort()) !== JSON.stringify(Object.keys(local).sort())
+        if (changed) {
+          bank.data = { version: 1, words: merged }
+          saveBankSoon()
+          store.set({ bankTick: Date.now() })
+        }
+        // Push when the Host has not caught up: an empty server file, or records
+        // this browser holds that the file does not.
+        if (mergedCount > remoteCount) pushBank()
+      } catch (error) {
+        /* offline is not fatal: the browser copy stays authoritative */
+      }
+    }
+
     /**
      * A stored record is data from an older version of this plugin, so every
      * field is rebuilt from a known type instead of trusted. Bad records are
@@ -1210,6 +1276,7 @@ window.__ModuleLoader__.load({
       } catch (error) {
         /* quota exhaustion leaves the in-memory bank intact */
       }
+      pushBank()
       store.set({ bankTick: Date.now() })
     }
 
@@ -4302,6 +4369,7 @@ nav.SNx2jG_frame {
       inject: ['slots'],
       apply(ctx) {
         loadBank()
+        hydrateBank()
         services.sessions = safeService(ctx, 'sessions')
         services.uiWorkspace = safeService(ctx, 'uiWorkspace')
 

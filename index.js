@@ -14,17 +14,42 @@
  * without the route; the Client then reports that no definition is available.
  */
 
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const ROUTE_PATH = '/complex-words/define'
 const PING_PATH = '/complex-words/ping'
+const BANK_PATH = '/complex-words/bank'
 const MAX_BODY_BYTES = 64 * 1024
+const MAX_BANK_BYTES = 4 * 1024 * 1024
 const MAX_TERM = 120
 const MAX_CONTEXT = 400
 const MAX_OUTPUT_CHARS = 1200
 
 const LOG_PATH = fileURLToPath(new URL('host-boot.log', import.meta.url))
+// The bank lives beside the plugin rather than in the browser profile: the GUI
+// port changes on every restart, and localStorage is keyed by origin, so a
+// browser-only bank would start empty each time.
+const BANK_FILE = fileURLToPath(new URL('bank.json', import.meta.url))
+
+function readBankFile() {
+  try {
+    const parsed = JSON.parse(readFileSync(BANK_FILE, 'utf8'))
+    if (parsed && parsed.version === 1 && parsed.words && typeof parsed.words === 'object') return parsed
+  } catch (error) {
+    /* a missing or corrupt file is an empty bank, not an error */
+  }
+  return { version: 1, words: {} }
+}
+
+function writeBankFile(payload) {
+  const body = JSON.stringify(payload)
+  if (body.length > MAX_BANK_BYTES) throw new Error('bank too large')
+  const temp = BANK_FILE + '.tmp'
+  writeFileSync(temp, body, 'utf8')
+  renameSync(temp, BANK_FILE)
+  return body.length
+}
 
 function bootLog(line) {
   try {
@@ -49,13 +74,14 @@ function sendJson(res, status, payload) {
   res.end(body)
 }
 
-function readJsonBody(req) {
+function readJsonBody(req, limit) {
+  const cap = limit || MAX_BODY_BYTES
   return new Promise((resolve, reject) => {
     const chunks = []
     let size = 0
     req.on('data', (chunk) => {
       size += chunk.length
-      if (size > MAX_BODY_BYTES) {
+      if (size > cap) {
         reject(new Error('payload too large'))
         req.destroy()
         return
@@ -579,15 +605,51 @@ export function apply(ctx) {
     })
   }
 
+  /**
+   * The word bank, stored on disk so it survives a restart (the GUI port, and
+   * therefore the browser origin, changes every time the harness starts).
+   * GET returns the stored bank; PUT replaces it atomically.
+   */
+  const bankRoute = async (req, res) => {
+    if (req.method === 'GET') {
+      sendJson(res, 200, readBankFile())
+      return
+    }
+    if (req.method !== 'PUT') {
+      sendJson(res, 405, { error: 'use GET or PUT' })
+      return
+    }
+    let body
+    try {
+      body = await readJsonBody(req, MAX_BANK_BYTES)
+    } catch (error) {
+      sendJson(res, 400, { error: error instanceof Error ? error.message : 'invalid request' })
+      return
+    }
+    if (!body || body.version !== 1 || !body.words || typeof body.words !== 'object' || Array.isArray(body.words)) {
+      sendJson(res, 400, { error: 'expected { version: 1, words: {} }' })
+      return
+    }
+    try {
+      const bytes = writeBankFile(body)
+      sendJson(res, 200, { ok: true, bytes, words: Object.keys(body.words).length })
+    } catch (error) {
+      sendJson(res, 500, { error: error instanceof Error ? error.message : 'could not write the bank' })
+    }
+  }
+
   ctx.effect(() => {
     const offDefine = webServer.register({ kind: 'exact', path: ROUTE_PATH, handler })
     bootLog('registered ' + ROUTE_PATH)
     const offPing = webServer.register({ kind: 'exact', path: PING_PATH, handler: ping })
     bootLog('registered ' + PING_PATH)
+    const offBank = webServer.register({ kind: 'exact', path: BANK_PATH, handler: bankRoute })
+    bootLog('registered ' + BANK_PATH)
     return () => {
       offDefine()
       offPing()
-      bootLog('disposed both routes')
+      offBank()
+      bootLog('disposed all routes')
     }
   })
 }
